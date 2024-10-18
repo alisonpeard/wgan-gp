@@ -32,7 +32,7 @@ G_optimizer = optim.Adam(generator.parameters(), lr=lr, betas=betas)
 D_optimizer = optim.Adam(discriminator.parameters(), lr=lr, betas=betas)
 
 # Train model
-epochs = 1
+epochs = 50
 trainer = Trainer(generator, discriminator, G_optimizer, D_optimizer,
                   device="mps")
 

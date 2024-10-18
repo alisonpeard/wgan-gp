@@ -137,7 +137,7 @@ class Trainer():
 
         if save_training_gif:
             training_progress_images = [(im * 255).astype(np.uint8) for im in training_progress_images]
-            imageio.mimsave('./training_{}_epochs.gif'.format(epochs),
+            imageio.mimsave('gifs/training_{}_epochs.gif'.format(epochs),
                             training_progress_images)
 
     def sample_generator(self, num_samples):
