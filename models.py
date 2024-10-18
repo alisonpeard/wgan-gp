@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+from residual import ResidualUpBlock, ResidualDownBlock, GumbelEsque
 
 
 class Generator(nn.Module):
@@ -19,17 +20,22 @@ class Generator(nn.Module):
         )
 
         self.features_to_image = nn.Sequential(
-            nn.ConvTranspose2d(8 * dim, 4 * dim, 4, 2, 1),
-            nn.ReLU(),
-            nn.BatchNorm2d(4 * dim),
-            nn.ConvTranspose2d(4 * dim, 2 * dim, 4, 2, 1),
-            nn.ReLU(),
-            nn.BatchNorm2d(2 * dim),
-            nn.ConvTranspose2d(2 * dim, dim, 4, 2, 1),
-            nn.ReLU(),
-            nn.BatchNorm2d(dim),
+            # nn.ConvTranspose2d(8 * dim, 4 * dim, 4, 2, 1),
+            # nn.ReLU(),
+            # nn.BatchNorm2d(4 * dim),
+            # nn.ConvTranspose2d(4 * dim, 2 * dim, 4, 2, 1),
+            # nn.ReLU(),
+            # nn.BatchNorm2d(2 * dim),
+            # nn.ConvTranspose2d(2 * dim, dim, 4, 2, 1),
+            # nn.ReLU(),
+            # nn.BatchNorm2d(dim),
+            # nn.ConvTranspose2d(dim, self.img_size[2], 4, 2, 1),
+            # nn.Sigmoid()
+            ResidualUpBlock(8*dim, 4*dim, (4,4), 2, 1),
+            ResidualUpBlock(4*dim, 2*dim, (4,4), 2, 1),
+            ResidualUpBlock(2*dim, dim, (4,4), 2, 1),
             nn.ConvTranspose2d(dim, self.img_size[2], 4, 2, 1),
-            nn.Sigmoid()
+            GumbelEsque()
         )
 
     def forward(self, input_data):
@@ -57,13 +63,17 @@ class Discriminator(nn.Module):
         self.img_size = img_size
 
         self.image_to_features = nn.Sequential(
-            nn.Conv2d(self.img_size[2], dim, 4, 2, 1),
-            nn.LeakyReLU(0.2),
-            nn.Conv2d(dim, 2 * dim, 4, 2, 1),
-            nn.LeakyReLU(0.2),
-            nn.Conv2d(2 * dim, 4 * dim, 4, 2, 1),
-            nn.LeakyReLU(0.2),
-            nn.Conv2d(4 * dim, 8 * dim, 4, 2, 1),
+            # nn.Conv2d(self.img_size[2], dim, 4, 2, 1),
+            # nn.LeakyReLU(0.2),
+            # nn.Conv2d(dim, 2 * dim, 4, 2, 1),
+            # nn.LeakyReLU(0.2),
+            # nn.Conv2d(2 * dim, 4 * dim, 4, 2, 1),
+            # nn.LeakyReLU(0.2),
+            # nn.Conv2d(4 * dim, 8 * dim, 4, 2, 1),
+            ResidualDownBlock(self.img_size[2], dim, (4,4), 2, 1),
+            ResidualDownBlock(dim, 2*dim, (4,4), 2, 1),
+            ResidualDownBlock(2*dim, 4*dim, (4,4), 2, 1),
+            nn.Conv2d(4*dim, 8*dim, 4, 2, 1),
             nn.Sigmoid()
         )
 
@@ -72,7 +82,7 @@ class Discriminator(nn.Module):
         output_size = int(8 * dim * (img_size[0] / 16) * (img_size[1] / 16))
         self.features_to_prob = nn.Sequential(
             nn.Linear(output_size, 1),
-            nn.Sigmoid()
+            nn.Sigmoid() # apparently this shouldn't be used for WGAN-GP
         )
 
     def forward(self, input_data):

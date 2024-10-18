@@ -25,6 +25,8 @@ class Trainer():
         self.G.to(device)
         self.D.to(device)
 
+        self.netork = nn.ModuleList([self.G, self.D])
+
     def _critic_train_iteration(self, data):
         """ """
         # Get generated data

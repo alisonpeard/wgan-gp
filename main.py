@@ -14,7 +14,6 @@ if not torch.backends.mps.is_available():
         print("MPS not available because the current MacOS version is not 12.3+ "
               "and/or you do not have an MPS-enabled device on this machine.")
 
-# %%
 
 data_loader, _ = get_mnist_dataloaders(batch_size=64) # need to add to mps
 img_size = (32, 32, 1)
@@ -32,14 +31,14 @@ G_optimizer = optim.Adam(generator.parameters(), lr=lr, betas=betas)
 D_optimizer = optim.Adam(discriminator.parameters(), lr=lr, betas=betas)
 
 # Train model
-epochs = 50
+epochs = 2
 trainer = Trainer(generator, discriminator, G_optimizer, D_optimizer,
                   device="mps")
 
-training_progress_images = trainer.train(data_loader, epochs, save_training_gif=True)
+trainer.train(data_loader, epochs, save_training_gif=True)
 
-# %% Save models
-name = 'mnist_model'
+# Save models
+name = 'mnist_residual'
 torch.save(trainer.G.state_dict(), './gen_' + name + '.pt')
 torch.save(trainer.D.state_dict(), './dis_' + name + '.pt')
 
