@@ -2,56 +2,62 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from residual import ResidualUpBlock, ResidualDownBlock, GumbelEsque
+from residual import ResidualUpBlock, ResidualDownBlock
 
 
 class Generator(nn.Module):
-    def __init__(self, img_size, latent_dim, dim):
+    def __init__(self, img_size, latent_dim, dim, residual=False, gumbel_latent=False):
         super(Generator, self).__init__()
-
         self.dim = dim
         self.latent_dim = latent_dim
         self.img_size = img_size
         self.feature_sizes = tuple(map(int, (self.img_size[0] / 16, self.img_size[1] / 16)))
+        self.gumbel_latent = gumbel_latent
 
         self.latent_to_features = nn.Sequential(
             nn.Linear(latent_dim, 8 * dim * self.feature_sizes[0] * self.feature_sizes[1]),
             nn.ReLU()
         )
 
-        self.features_to_image = nn.Sequential(
-            # nn.ConvTranspose2d(8 * dim, 4 * dim, 4, 2, 1),
-            # nn.ReLU(),
-            # nn.BatchNorm2d(4 * dim),
-            # nn.ConvTranspose2d(4 * dim, 2 * dim, 4, 2, 1),
-            # nn.ReLU(),
-            # nn.BatchNorm2d(2 * dim),
-            # nn.ConvTranspose2d(2 * dim, dim, 4, 2, 1),
-            # nn.ReLU(),
-            # nn.BatchNorm2d(dim),
-            # nn.ConvTranspose2d(dim, self.img_size[2], 4, 2, 1),
-            # nn.Sigmoid()
-            ResidualUpBlock(8*dim, 4*dim, (4,4), 2, 1),
-            ResidualUpBlock(4*dim, 2*dim, (4,4), 2, 1),
-            ResidualUpBlock(2*dim, dim, (4,4), 2, 1),
-            nn.ConvTranspose2d(dim, self.img_size[2], 4, 2, 1),
-            GumbelEsque()
-        )
+        if residual:
+            self.features_to_image = nn.Sequential(
+                ResidualUpBlock(8 * dim, 4 * dim, (4, 4), 2, 1),
+                ResidualUpBlock(4 * dim, 2 * dim, (4, 4), 2, 1),
+                ResidualUpBlock(2 * dim, dim, (4, 4), 2, 1),
+                nn.ConvTranspose2d(dim, self.img_size[2], 4, 2, 1),
+                nn.GELU() # want unbounded in both directions so GELU, LeakyRELU, or nothing
+            )
+        else:
+            self.features_to_image = nn.Sequential(
+                nn.ConvTranspose2d(8 * dim, 4 * dim, 4, 2, 1),
+                nn.ReLU(),
+                nn.BatchNorm2d(4 * dim),
+                nn.ConvTranspose2d(4 * dim, 2 * dim, 4, 2, 1),
+                nn.ReLU(),
+                nn.BatchNorm2d(2 * dim),
+                nn.ConvTranspose2d(2 * dim, dim, 4, 2, 1),
+                nn.ReLU(),
+                nn.BatchNorm2d(dim),
+                nn.ConvTranspose2d(dim, self.img_size[2], 4, 2, 1),
+                nn.Sigmoid()
+            )
+
 
     def forward(self, input_data):
-        # Map latent into appropriate size for transposed convolutions
         x = self.latent_to_features(input_data)
-        # Reshape
         x = x.view(-1, 8 * self.dim, self.feature_sizes[0], self.feature_sizes[1])
-        # Return generated image
         return self.features_to_image(x)
 
     def sample_latent(self, num_samples):
-        return torch.randn((num_samples, self.latent_dim))
+        if self.gumbel_latent:
+            latent = torch.rand((num_samples, self.latent_dim))
+            return -torch.log(-torch.log(latent))
+        else:
+            return torch.randn((num_samples, self.latent_dim))
 
 
 class Discriminator(nn.Module):
-    def __init__(self, img_size, dim):
+    def __init__(self, img_size, dim, residual=False):
         """
         img_size : (int, int, int)
             Height and width must be powers of 2.  E.g. (32, 32, 1) or
@@ -62,20 +68,26 @@ class Discriminator(nn.Module):
 
         self.img_size = img_size
 
-        self.image_to_features = nn.Sequential(
-            # nn.Conv2d(self.img_size[2], dim, 4, 2, 1),
-            # nn.LeakyReLU(0.2),
-            # nn.Conv2d(dim, 2 * dim, 4, 2, 1),
-            # nn.LeakyReLU(0.2),
-            # nn.Conv2d(2 * dim, 4 * dim, 4, 2, 1),
-            # nn.LeakyReLU(0.2),
-            # nn.Conv2d(4 * dim, 8 * dim, 4, 2, 1),
-            ResidualDownBlock(self.img_size[2], dim, (4,4), 2, 1),
-            ResidualDownBlock(dim, 2*dim, (4,4), 2, 1),
-            ResidualDownBlock(2*dim, 4*dim, (4,4), 2, 1),
-            nn.Conv2d(4*dim, 8*dim, 4, 2, 1),
-            nn.Sigmoid()
-        )
+        if residual:
+            self.image_to_features = nn.Sequential(
+                ResidualDownBlock(self.img_size[2], dim, (4,4), 2, 1),
+                ResidualDownBlock(dim, 2 * dim, (4,4), 2, 1),
+                ResidualDownBlock(2 * dim, 4 * dim, (4,4), 2, 1),
+                nn.Conv2d(4 * dim, 8 * dim, 4, 2, 1),
+                nn.Sigmoid()
+            )
+        else:
+            self.image_to_features = nn.Sequential(
+                nn.Conv2d(self.img_size[2], dim, 4, 2, 1),
+                nn.LeakyReLU(0.2),
+                nn.Conv2d(dim, 2 * dim, 4, 2, 1),
+                nn.LeakyReLU(0.2),
+                nn.Conv2d(2 * dim, 4 * dim, 4, 2, 1),
+                nn.LeakyReLU(0.2),
+                nn.Conv2d(4 * dim, 8 * dim, 4, 2, 1),
+                nn.Sigmoid()
+            )
+
 
         # 4 convolutions of stride 2, i.e. halving of size everytime
         # So output size will be 8 * (img_size / 2 ^ 4) * (img_size / 2 ^ 4)

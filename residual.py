@@ -2,8 +2,7 @@
 import torch
 import numpy as np
 import torch.nn.functional as F
-# from torchsort import soft_rank
-from ranking.pytorch_ops import soft_rank
+import warnings
 from typing import Tuple, Union
 
 
@@ -47,6 +46,8 @@ def downsample(x, kernel_size:tuple, stride:int=1, padding:int=0) -> torch.Tenso
 
 def batchrank(x:torch.Tensor) -> torch.Tensor:
     """Differentiable ranking."""
+    # from torchsort import soft_rank
+    from ranking.pytorch_ops import soft_rank
     b, h, w, c, = x.size()
     x = x.reshape(b, h*w*c)
     x = x.t()
@@ -57,9 +58,10 @@ def batchrank(x:torch.Tensor) -> torch.Tensor:
 
 
 class GumbelEsque(torch.nn.Module):
-    """Total experiment -- might be too slow"""
+    """Total experiment, NOTE: not using."""
     def __init__(self):
         super().__init__()
+        raise NotImplementedError("Function to slow to use in training.")
 
     def forward(self, x):
         n = x.size(0)
@@ -81,7 +83,7 @@ class ResidualUpBlock(torch.nn.Module):
         self.out_channels = out_channels
 
         self.deconv = torch.nn.ConvTranspose2d(in_channels, out_channels, kernel_size, stride, padding)
-        self.activation = torch.nn.ReLU() # GELU()
+        self.activation = torch.nn.ReLU() # GELU(), SiLU()
         self.norm = torch.nn.BatchNorm2d(out_channels)
         self.upsample = lambda x: upsample(x, kernel_size, stride, padding, upsample_mode)
         self.project = torch.nn.Conv2d(self.in_channels, self.out_channels, 1, 1)

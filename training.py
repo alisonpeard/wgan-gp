@@ -10,17 +10,18 @@ from torch.autograd import grad as torch_grad
 class Trainer():
     def __init__(self, generator, discriminator, gen_optimizer, dis_optimizer,
                  gp_weight=10, critic_iterations=5, print_every=50,
-                 device='mps'):
+                 device='mps', label='training', num_steps=0):
         self.G = generator
         self.G_opt = gen_optimizer
         self.D = discriminator
         self.D_opt = dis_optimizer
         self.losses = {'G': [], 'D': [], 'GP': [], 'gradient_norm': []}
-        self.num_steps = 0
+        self.num_steps = num_steps
         self.device = device
         self.gp_weight = gp_weight
         self.critic_iterations = critic_iterations
         self.print_every = print_every
+        self.label = label
 
         self.G.to(device)
         self.D.to(device)
@@ -139,7 +140,7 @@ class Trainer():
 
         if save_training_gif:
             training_progress_images = [(im * 255).astype(np.uint8) for im in training_progress_images]
-            imageio.mimsave('gifs/training_{}_epochs.gif'.format(epochs),
+            imageio.mimsave('gifs/{}_{}_epochs.gif'.format(self.label, epochs),
                             training_progress_images)
 
     def sample_generator(self, num_samples):
