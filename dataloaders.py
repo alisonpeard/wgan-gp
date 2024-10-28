@@ -7,40 +7,48 @@ from torchvision import datasets, transforms
 from dotenv import load_dotenv, find_dotenv
 
 # %%
-def get_era5_dataloaders(batch_size=128, img_size=(32, 32),
-                         train_size=60000, test_size=10000,
-                         gumbel=False, **kwargs):
+def get_era5_dataloaders(batch_size=128,
+                         img_size=(32,32),
+                         train_size=60000,
+                         test_size=10000,
+                         gumbel=False,
+                         nvars=2,
+                         **kwargs
+                         ):
     load_dotenv(find_dotenv(usecwd=True))
     path = os.getenv('PRETRAIN_PATH')
     data = np.load(path)['data']
     data = np.flip(data, axis=1) # Northern hemisphere
+    data = data[..., :nvars]
 
     all_transforms = transforms.Compose([
+        tensor,
         transforms.Resize(img_size)
     ])
 
-    # Generate random indices for train and test sets
-    indices = np.random.permutation(len(data))
-    train_indices = indices[:train_size]
-    test_indices = indices[train_size:train_size + test_size]
+    random_indices = np.random.permutation(len(data))
+    train_indices = random_indices[:train_size]
+    test_indices = random_indices[train_size:train_size + test_size]
     train = data[train_indices, ...].astype(np.float32)
     test = data[test_indices, ...].astype(np.float32)
-    train = train.reshape(len(train), 1, train.shape[1], train.shape[2])
-    test = test.reshape(len(test), 1, test.shape[1], test.shape[2])
+    train = np.transpose(train, axes=(0, 3, 1, 2))
+    test = np.transpose(test, axes=(0, 3, 1, 2))
+    train = train.reshape(len(train), nvars, train.shape[2], train.shape[3])
+    test = test.reshape(len(test), nvars, test.shape[2], test.shape[3])
+
     if gumbel:
         train = -np.log(-np.log(train))
         test = -np.log(-np.log(test))
-    train = tensor(train)
-    test = tensor(test)
 
     # all_transforms(data)
     train = TensorDataset(all_transforms(train))
     test = TensorDataset(all_transforms(test))
+
     train_loader = DataLoader(train, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test, batch_size=batch_size, shuffle=True)
     return train_loader, test_loader
 
-
+# %%
 def get_mnist_dataloaders(batch_size=128, **kwargs):
     """MNIST dataloader with (32, 32) sized images."""
     # Resize images so they are a power of 2

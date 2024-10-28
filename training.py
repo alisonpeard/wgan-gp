@@ -5,18 +5,19 @@ import torch.nn as nn
 from torchvision.utils import make_grid
 from torch.autograd import Variable
 from torch.autograd import grad as torch_grad
+from torchvision.transforms import Resize
 
 
 class Trainer():
     def __init__(self, generator, discriminator, gen_optimizer, dis_optimizer,
                  gp_weight=10, critic_iterations=5, print_every=50,
-                 device='mps', label='training', num_steps=0):
+                 device='mps', label='training'):
         self.G = generator
         self.G_opt = gen_optimizer
         self.D = discriminator
         self.D_opt = dis_optimizer
         self.losses = {'G': [], 'D': [], 'GP': [], 'gradient_norm': []}
-        self.num_steps = num_steps
+        self.num_steps = 0
         self.device = device
         self.gp_weight = gp_weight
         self.critic_iterations = critic_iterations
@@ -118,7 +119,7 @@ class Trainer():
                 if self.num_steps > self.critic_iterations:
                     print("G: {}".format(self.losses['G'][-1]))
 
-    def train(self, data_loader, epochs, save_training_gif=True):
+    def train(self, data_loader, epochs, save_training_gif=True, save_numpy=True):
         if save_training_gif:
             # Fix latents to see how image generation improves during training
             fixed_latents = Variable(self.G.sample_latent(64))
@@ -142,6 +143,18 @@ class Trainer():
             training_progress_images = [(im * 255).astype(np.uint8) for im in training_progress_images]
             imageio.mimsave('gifs/{}_{}_epochs.gif'.format(self.label, epochs),
                             training_progress_images)
+        if save_numpy:
+            samples = []
+            for _ in range(10):
+                sample = self.sample_generator(100).cpu().data
+                sample = Resize((18, 22))(sample)
+                sample = torch.permute(sample, (0, 2, 3, 1))
+                sample = torch.flip(sample, (1,))
+                samples.append(sample)
+            samples = np.concatenate(samples)
+            np.savez('arrs/{}_{}_epochs'.format(self.label, epochs),
+                            data=samples)
+
 
     def sample_generator(self, num_samples):
         latent_samples = Variable(self.G.sample_latent(num_samples))

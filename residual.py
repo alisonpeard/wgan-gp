@@ -72,12 +72,15 @@ class GumbelEsque(torch.nn.Module):
 
 class ResidualUpBlock(torch.nn.Module):
     """Single residual block for upsampling (increasing resolution)."""
-    def __init__(self, in_channels: int, out_channels: int,
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
                  kernel_size: Tuple,
                  stride: int = 1,
                  padding: int = 0,
                  upsample_mode: str = 'bilinear',
-                 **kwargs) -> None:
+                 **kwargs
+                 ) -> None:
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -168,5 +171,6 @@ if __name__ == "__main__":
                 assert np.array_equal(batchrank(x)[:, :, 0, 0], torch.tensor([[3., 2.],[4., 3.], [2., 1.], [1., 4.]]))
     
     print('All tests passed!')
+
 
 # %%
